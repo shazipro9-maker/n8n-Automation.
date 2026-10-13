@@ -8,5 +8,5 @@ This repository contains a production-ready, multi-layered n8n automation workfl
 * **RAG System Deployment:** Connected to Supabase vector databases to dynamically pull context and resolve customer support queries autonomously.
 * **LLM Fallback Strategy:** Built automatic switching safeguards between OpenAI and Claude APIs to ensure 100% uptime during network failures.
 
-[Click Here to Watch the 2-Minute System Walkthrough Video 🔗](​https://bit.ly/4xYU3GJ)
+ Click Here to Watch the 2-Minute System Walkthrough Video 🔗​https://bit.ly/4xYU3GJ
 
