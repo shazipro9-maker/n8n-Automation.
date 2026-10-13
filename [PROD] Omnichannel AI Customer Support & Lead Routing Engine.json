@@ -1,0 +1,572 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "multipleMethods": true,
+        "httpMethod": [
+          "POST"
+        ],
+        "path": "1198c837-b048-4745-96fd-e71a94548288",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -528,
+        -192
+      ],
+      "id": "62687d5e-9e8e-45e8-92b9-b37c7b0629e5",
+      "name": "Webhook",
+      "webhookId": "1198c837-b048-4745-96fd-e71a94548288"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "ok",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -304,
+        -192
+      ],
+      "id": "18b00df5-f077-45a1-8840-5088422bacfc",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst output = [];\n\nfor (const item of items) {\n  try {\n    // 1. Safely handle both object and stringified JSON payloads from Meta\n    let rawBody = item.json.body || item.json;\n    if (typeof rawBody === 'string') {\n      try { rawBody = JSON.parse(rawBody); } catch (e) {}\n    }\n\n    const entry = rawBody?.entry?.[0];\n    const messaging = entry?.messaging?.[0];\n\n    // 2. Drop if there is no messaging payload\n    if (!messaging) {\n      continue;\n    }\n\n    // 3. CRITICAL: Drop bot echoes (messages sent by your own page) to prevent loops\n    if (messaging.message?.is_echo === true) {\n      continue;\n    }\n\n    // 4. Extract senderId, message text, and unique message ID (mid)\n    const senderId = messaging?.sender?.id;\n    const messageText = messaging?.message?.text;\n    const messageId = messaging?.message?.mid;\n\n    if (!senderId || !messageText || !messageId) {\n      continue;\n    }\n\n    // 5. Output valid user text messages along with messageId for deduplication\n    output.push({\n      json: {\n        senderId: senderId,\n        messageId: messageId,\n        message: messageText,\n        receivedAt: new Date().toISOString()\n      }\n    });\n  } catch (err) {\n    // Silently skip system pings or malformed data to keep executions clean\n    continue;\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -192
+      ],
+      "id": "5bb3b440-aaed-4802-912c-3f3f3b8fb824",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "1eG_wSSD7w1NwGXaNvtsMwbMkrAIrvypR9uiWz6jcwNA",
+          "mode": "list",
+          "cachedResultName": "Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1eG_wSSD7w1NwGXaNvtsMwbMkrAIrvypR9uiWz6jcwNA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1eG_wSSD7w1NwGXaNvtsMwbMkrAIrvypR9uiWz6jcwNA/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        592,
+        -192
+      ],
+      "id": "26b2796d-76df-4b1b-b04f-4c4a0ca37658",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "AYDkmsdRIxzXR4D2",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        816,
+        -192
+      ],
+      "id": "dc4ca0c5-d310-45db-ae63-202dddff538c",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Code in JavaScript').item.json.message }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "ROLE & IDENTITY\nYou are a warm, highly professional, empathetic, and human-like Customer Support Specialist for our business on Instagram. Your primary mission is to assist customers in chat, answer inquiries accurately using ONLY the provided catalog data, resolve product issues gracefully, suggest relevant items from the actual inventory, and build customer loyalty.\n\nSTRICT INVENTORY & ANTI-HALLUCINATION RULES\n1. YOU MUST ONLY USE REAL DATA: Answer product and pricing questions strictly using the rows provided in the \"Get row(s) in sheet\" / Catalog Context. \n2. NEVER GUESS OR INVENT: If an item, color, size, or price is not explicitly listed in the catalog data, do not assume it exists. Never hallucinate stock status or product details.\n3. MATCH ACCurately: When a customer asks for an item (e.g., \"gloves\"), carefully scan all provided catalog rows. If items match (e.g., Driving Gloves, Thermal Gloves, Fleece Gloves), list the actual options available in stock with their exact details and prices.\n\nCORE CONVERSATIONAL RULES\nGREETING & HELLO PROTOCOL\n- ALWAYS open with a natural, friendly greeting incorporating the customer's name if available (e.g., \"Hey [Name]!\" or \"Hi [Name]!\").\n- IF the conversation history shows you have already greeted the customer in this chat thread, do NOT repeat full greetings. Maintain a natural, ongoing messaging flow.\n- Keep messages crisp, conversational, polite, and engaging (avoid overly formal, long email-style paragraphs).\n\nPRICING & COST RULES\n- ALWAYS state prices clearly when a customer explicitly asks for the price, cost, rates, or total of an item.\n- IF a customer asks about a specific product without explicitly asking for the price, mention the key details first and include the price naturally from the catalog.\n- IF a product price or item variant is genuinely missing from the catalog context, state warmly: \"I want to make sure I give you the exact details—let me double-check our live inventory with our team and get back to you right away!\"\n\nWARM EMPATHY & OUT-OF-STOCK HANDLING\n- IF the requested product or specific style/color is OUT OF STOCK or NOT IN THE CATALOG:\n  a) Respond with absolute warmth and politeness so the customer feels respected: \"Thank you so much for asking about that! Unfortunately, we currently don't have that exact item in stock right now, but I appreciate you looking.\"\n  b) Proactively and warmly suggest 1 to 2 relevant alternative products that *are* present in the current catalog context.\n  c) Explain the connection kindly (e.g., \"While those specific gloves aren't available, we do have our Genuine Leather Driving Gloves in stock, which feature a fantastic finish, or our Thermal Touchscreen Winter Gloves if you'd like something cozy!\").\n\nEMPATHY, COMPLAINTS & DEFECT RESOLUTION\n- IF the customer expresses frustration, reports a broken/defective product, missing order, late shipping, or wrong item received:\n  a) OPEN IMMEDIATELY with a genuine, warm apology: \"I'm so sorry to hear that you experienced this issue!\"\n  b) Validate their frustration directly without making corporate excuses.\n  c) Offer an actionable resolution (e.g., immediate replacement check, refund request escalation, or store support follow-up).\n  d) FLAG FOR OWNER: If the issue involves refund demands or severe complaints, include the code tag [ESCALATE_TO_OWNER] at the very end of your response.\n\nESCALATION PROTOCOL\nInclude [ESCALATE_TO_OWNER] at the very end of your response under any of these conditions:\n- Customer asks for bulk pricing or wholesale discounts beyond standard catalog rates.\n- Customer requests to speak directly to the manager, founder, or owner.\n- Customer demands a full refund or threatens legal/chargeback action.\n\nFORMATTING & OUTPUT RULES\n- Return clean, ready-to-send chat text ONLY.\n- Keep formatting optimized for mobile reading (use line breaks naturally; avoid huge text blocks).\n- DO NOT include subject lines, markdown code fences, or raw JSON.\n- Sign off casually or professionally depending on the chat vibe, e.g., \"Best, Customer Support Team\" or a friendly closing sign-off.\n- NEVER use asterisks (*), markdown bolding, or markdown italics in your responses. Write product names in plain text only (e.g., Genuine Leather Driving Gloves)."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1072,
+        -192
+      ],
+      "id": "1a62840d-7a37-4637-b29d-5de882459060",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        48
+      ],
+      "id": "c2e410a0-a519-4174-af82-b1d270953d2e",
+      "name": "Google Gemini Chat Model"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Code in JavaScript').item.json.senderId }}",
+        "tableName": "n8n",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.4,
+      "position": [
+        1232,
+        48
+      ],
+      "id": "5fa93af4-e9b8-4044-8af2-272eb2659643",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "s6SYMnfb6nKulOpW",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1eG_wSSD7w1NwGXaNvtsMwbMkrAIrvypR9uiWz6jcwNA",
+          "mode": "list",
+          "cachedResultName": "Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1eG_wSSD7w1NwGXaNvtsMwbMkrAIrvypR9uiWz6jcwNA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1339196839,
+          "mode": "list",
+          "cachedResultName": "Sheet2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1eG_wSSD7w1NwGXaNvtsMwbMkrAIrvypR9uiWz6jcwNA/edit#gid=1339196839"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sender id": "={{ $json.senderId }}",
+            "message": "={{ $json.message }}",
+            "recieved at": "={{ $json.receivedAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sender id",
+              "displayName": "sender id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "recieved at",
+              "displayName": "recieved at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        368,
+        -192
+      ],
+      "id": "cdb2321c-690f-451b-8fb5-921ba99998cb",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "AYDkmsdRIxzXR4D2",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/1270650339472422/messages",
+        "sendHeaders": true,
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"id\": \"{{ $json.recipient.id }}\"\n  },\n  \"message\": {\n    \"text\": {{ JSON.stringify($json.message.text) }}\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2080,
+        -288
+      ],
+      "id": "ff15b917-ee3c-4d18-80d2-246c07cdb99e",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Grab the sender ID and message ID from your earlier preprocessing step\nconst senderId = $('Code in JavaScript').first().json.senderId;\nconst messageId = $('Code in JavaScript').first().json.messageId;\n\n// Grab the raw text from the AI Agent, strip bracketed tags, and remove all markdown asterisks and underscores\nconst rawAiText = $('AI Agent').first().json.output;\nconst aiText = rawAiText.replace(/\\[.*?\\]/g, '').replace(/[*_]/g, '').trim();\n\n// Return the cleaned JSON payload including messageId for the deduplication node\nreturn [{\n  json: {\n    messageId: messageId,\n    recipient: { id: senderId },\n    message: { text: aiText }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        -288
+      ],
+      "id": "054c7dc2-4b39-4983-880e-cf2e44636165",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "dedupeValue": "={{ $json.messageId }}",
+        "options": {
+          "scope": "workflow",
+          "historySize": 10000
+        }
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        144,
+        -192
+      ],
+      "id": "10b58eea-b8d6-4386-89e2-4de72ccbb32f",
+      "name": "Remove Duplicates"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1072,
+        48
+      ],
+      "id": "7b0b99ea-47a3-4092-84d7-615198f7f720",
+      "name": "OpenRouter Chat Model"
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "dedupeValue": "={{ $json.messageId }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        -288
+      ],
+      "id": "c582cb18-784a-4afb-9c82-8405133d8a8d",
+      "name": "Remove Duplicates1"
+    },
+    {
+      "parameters": {
+        "fromEmail": "shazipro9@gmail.com",
+        "toEmail": "shazipro9@gmail.com",
+        "subject": "Support",
+        "emailFormat": "text",
+        "text": "=--- Original Customer Message ---\n{{ $('Webhook').item.json.body.entry[0].messaging[0].message.text }}\n\n--- AI Generated Response ---\n{{ $('AI Agent').item.json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1856,
+        -96
+      ],
+      "id": "ecae1939-9c77-43dc-bfe3-c0e03d2f771c",
+      "name": "Send an Email",
+      "webhookId": "6e55aa80-d21e-4190-ae56-46234dc6b903",
+      "credentials": {
+        "smtp": {
+          "id": "ge7BCOvnaI9Stzax",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Grab the incoming customer message directly from the Webhook node\nconst message = $('Webhook').item.json.body.entry[0].messaging[0].message.text.toLowerCase();\n\n// Define comprehensive keywords for refunds, complaints, product damage, and support escalation\nconst supportKeywords = [\n  'money back', 'refund', 'return', 'cancel', \n  'teared', 'torn', 'damaged', 'broken', 'defective', 'ruined', \n  'bullshit', 'scam', 'fraud', 'complaint', 'terrible', 'horrible',\n  'support', 'help', 'issue', 'problem', 'agent', 'human', 'speak to someone'\n];\n\n// Check if the customer message contains any trigger phrase\nconst needsSupport = supportKeywords.some(keyword => message.includes(keyword));\n\nif (needsSupport) {\n  return [{ \n    json: {\n      originalMessage: $('Webhook').item.json.body.entry[0].messaging[0].message.text,\n      escalationReason: \"Customer requested a refund, reported product damage, or used complaint keywords.\",\n      timestamp: new Date().toISOString()\n    } \n  }];\n} else {\n  return [];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        -96
+      ],
+      "id": "310f811a-3cfc-4bb5-b331-7bfc82b9f01a",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "1eG_wSSD7w1NwGXaNvtsMwbMkrAIrvypR9uiWz6jcwNA",
+          "mode": "list",
+          "cachedResultName": "Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1eG_wSSD7w1NwGXaNvtsMwbMkrAIrvypR9uiWz6jcwNA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1eG_wSSD7w1NwGXaNvtsMwbMkrAIrvypR9uiWz6jcwNA/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1392,
+        48
+      ],
+      "id": "c53af63a-df50-4cf6-ab65-1acd9edbb15b",
+      "name": "Get row(s) in sheet in Google Sheets",
+      "credentials": {
+        "googleApi": {
+          "id": "AYDkmsdRIxzXR4D2",
+          "name": "Google Sheets account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet in Google Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "2bea880a-34cf-474e-8254-85847450918d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8bc88e74518d22dedc523d1dd5a3daf9d57080a67a1c143e6609020711abdd01"
+  },
+  "nodeGroups": [],
+  "id": "T3qc9HN4OBL3Zynt",
+  "tags": []
+}
